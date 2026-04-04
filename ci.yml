@@ -1,29 +1,40 @@
-name: CI/CD Pipeline
+stages:
+  - build
+  - test
+  - package
 
-on: [push, pull_request]
+variables:
+  GIT_DEPTH: 1
 
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+before_script:
+  - apt-get update -qq && apt-get install -y -qq build-essential dpkg-dev
 
-      - name: Install dependencies
-        run: sudo apt-get install -y build-essential dpkg-dev
+build_job:
+  stage: build
+  script:
+    - make
+  artifacts:
+    paths:
+      - maxfinder
+    expire_in: 1 hour
 
-      - name: Build application
-        run: make
+test_job:
+  stage: test
+  script:
+    - make test
+  dependencies:
+    - build_job
 
-      - name: Run all tests
-        run: make test
-
-      - name: Build .deb package
-        run: |
-          chmod +x scripts/build_deb.sh
-          ./scripts/build_deb.sh
-
-      - name: Upload .deb artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: maxfinder-deb
-          path: ./*.deb
+package_job:
+  stage: package
+  script:
+    - make package
+  artifacts:
+    paths:
+      - "*.deb"
+    expire_in: 1 week
+  dependencies:
+    - build_job
+  only:
+    - main
+    - master
