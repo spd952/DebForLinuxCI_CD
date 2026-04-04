@@ -2,7 +2,7 @@
 set -e
 
 # Параметры
-PACKAGE_NAME="untitled1"
+PACKAGE_NAME="DebForLinuxCICD"
 VERSION="1.0.0"
 ARCH="amd64"
 MAINTAINER="Your Name <your.email@example.com>"
