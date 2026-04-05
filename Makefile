@@ -2,7 +2,7 @@ CXX = g++
 CXXFLAGS = -std=c++11 -Wall
 
 TARGET = hello
-SRC_DIR = ./
+SRC_DIR = src
 
 all: bin install
 
