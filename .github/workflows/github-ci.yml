@@ -132,3 +132,4 @@ jobs:
         run: |
           docker push ${{ secrets.DOCKERHUB_NAME }}/latin-checker:1.0.0
           docker push ${{ secrets.DOCKERHUB_NAME }}/latin-checker:latest
+
