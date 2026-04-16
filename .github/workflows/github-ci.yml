@@ -61,7 +61,7 @@ jobs:
         run: ./test.sh
         working-directory: ./cicd
 
-  Package:
+  Deploy:
     needs: Test
     runs-on: ubuntu-latest
 
@@ -85,7 +85,7 @@ jobs:
           path: usr/bin
 
       - name: Build package
-        run: ./package.sh "latin-checker_1.0_amd64.deb"
+        run: ./deploy.sh "../latin-checker_1.0_amd64.deb"
         working-directory: ./cicd
 
       - name: Upload package
@@ -93,42 +93,3 @@ jobs:
         with:
           name: latin-checker-deb-package
           path: latin-checker_1.0_amd64.deb
-
-  Deploy:
-    needs: Package
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Ensure docker is available
-        run: docker --version
-
-      - name: Clone repo
-        uses: actions/checkout@v4
-
-      - name: Download deb-package
-        uses: actions/download-artifact@v4
-        with:
-          name: latin-checker-deb-package
-          path: ./
-
-      - name: Build docker image
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_NAME }}/latin-checker:1.0.0 -f cicd/Dockerfile .
-          docker tag ${{ secrets.DOCKERHUB_NAME }}/latin-checker:1.0.0 nosmok1ng/latin-checker:latest
-
-      - name: Run container
-        run: |
-          echo "3\n1 2 3\n2 3 1\n3 1 2" | docker run -i ${{ secrets.DOCKERHUB_NAME }}/latin-checker:1.0.0
-
-      - name: Build minikube-compatible docker image
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_NAME }}/latin-checker-minikube:1.0.0 -f cicd/minikube/Dockerfile.minikube .
-          docker tag ${{ secrets.DOCKERHUB_NAME }}/latin-checker-minikube:1.0.0 ${{ secrets.DOCKERHUB_NAME }}/latin-checker-minikube:latest
-
-      - name: Log in to DockerHub
-        run: docker login -u ${{ secrets.DOCKERHUB_NAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Push to DockerHub
-        run: |
-          docker push ${{ secrets.DOCKERHUB_NAME }}/latin-checker:1.0.0
-          docker push ${{ secrets.DOCKERHUB_NAME }}/latin-checker:latest
