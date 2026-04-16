@@ -1,4 +1,67 @@
-  Deploy:
+name: CI-Pipeline
+
+on:
+  push:
+    branches: main
+  pull_request:
+    branches: main
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential g++ make
+
+      - name: Build program
+        run: ./build.sh
+        working-directory: ./cicd
+
+      - name: Upload binary to artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: latin-checker-binary
+          path: usr/bin/latin-checker
+          retention-days: 1
+
+  Test:
+    needs: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential g++ make tree
+
+      - name: Create usr/bin/ directory for binary
+        run: mkdir -p usr/bin
+        working-directory: .
+
+      - name: Download binary from artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: latin-checker-binary
+          path: usr/bin
+
+      - name: Give permissions to binary
+        run: chmod +x latin-checker
+        working-directory: ./usr/bin
+
+      - name: Run tests
+        run: ./test.sh
+        working-directory: ./cicd
+
+  Package:
     needs: Test
     runs-on: ubuntu-latest
 
@@ -21,30 +84,51 @@
           name: latin-checker-binary
           path: usr/bin
 
-      - name: Build package (without external script)
-        run: |
-          # Создаём структуру пакета
-          mkdir -p latin-checker_1.0_amd64/DEBIAN
-          mkdir -p latin-checker_1.0_amd64/usr/bin
-
-          # Копируем бинарник
-          cp usr/bin/latin-checker latin-checker_1.0_amd64/usr/bin/
-
-          # Формируем control-файл
-          cat > latin-checker_1.0_amd64/DEBIAN/control <<EOF
-          Package: latin-checker
-          Version: 1.0
-          Architecture: amd64
-          Maintainer: Your Name <your.email@example.com>
-          Description: Latin text checker
-           A tool for checking Latin texts.
-          EOF
-
-          # Собираем .deb пакет
-          dpkg-deb --build latin-checker_1.0_amd64
+      - name: Build package
+        run: ./package.sh "latin-checker_1.0_amd64.deb"
+        working-directory: ./cicd
 
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
           name: latin-checker-deb-package
           path: latin-checker_1.0_amd64.deb
+
+  Deploy:
+    needs: Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ensure docker is available
+        run: docker --version
+
+      - name: Clone repo
+        uses: actions/checkout@v4
+
+      - name: Download deb-package
+        uses: actions/download-artifact@v4
+        with:
+          name: latin-checker-deb-package
+          path: ./
+
+      - name: Build docker image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_NAME }}/latin-checker:1.0.0 -f cicd/Dockerfile .
+          docker tag ${{ secrets.DOCKERHUB_NAME }}/latin-checker:1.0.0 nosmok1ng/latin-checker:latest
+
+      - name: Run container
+        run: |
+          echo "3\n1 2 3\n2 3 1\n3 1 2" | docker run -i ${{ secrets.DOCKERHUB_NAME }}/latin-checker:1.0.0
+
+      - name: Build minikube-compatible docker image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_NAME }}/latin-checker-minikube:1.0.0 -f cicd/minikube/Dockerfile.minikube .
+          docker tag ${{ secrets.DOCKERHUB_NAME }}/latin-checker-minikube:1.0.0 ${{ secrets.DOCKERHUB_NAME }}/latin-checker-minikube:latest
+
+      - name: Log in to DockerHub
+        run: docker login -u ${{ secrets.DOCKERHUB_NAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push to DockerHub
+        run: |
+          docker push ${{ secrets.DOCKERHUB_NAME }}/latin-checker:1.0.0
+          docker push ${{ secrets.DOCKERHUB_NAME }}/latin-checker:latest
