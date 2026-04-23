@@ -45,7 +45,6 @@ jobs:
 
       - name: Create usr/bin/ directory for binary
         run: mkdir -p usr/bin
-        working-directory: .
 
       - name: Download binary from artifact
         uses: actions/download-artifact@v4
